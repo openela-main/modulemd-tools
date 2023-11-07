@@ -1,0 +1,47 @@
+From 0407a6af2f0c59e9619418a606d5d00183d40693 Mon Sep 17 00:00:00 2001
+From: Jakub Kadlcik <frostyx@email.cz>
+Date: Tue, 13 Jun 2023 18:19:15 +0200
+Subject: [PATCH 4/4] modulemd_tools: fix tests for new libmodulemd version
+ 2.15.0
+
+---
+ modulemd_tools/tests/test_yaml.py | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/modulemd_tools/tests/test_yaml.py b/modulemd_tools/tests/test_yaml.py
+index f51a330..2f8b4d2 100644
+--- a/modulemd_tools/tests/test_yaml.py
++++ b/modulemd_tools/tests/test_yaml.py
+@@ -27,6 +27,10 @@ def old_libmodulemd():
+     return Version(Modulemd.get_version()) < Version("2.11.1")
+ 
+ 
++def min_libmodulemd_version(version):
++    return Version(Modulemd.get_version()) >= Version(version)
++
++
+ class TestYaml(unittest.TestCase):
+ 
+     def test_is_valid(self):
+@@ -57,9 +61,16 @@ class TestYaml(unittest.TestCase):
+         self.assertEqual(mod1["version"], 2)
+         self.assertEqual(mod1["data"]["name"], "foo")
+         self.assertEqual(mod1["data"]["stream"], "stable")
+-        self.assertEqual(mod1["data"]["summary"], None)
+         self.assertEqual(mod1["data"]["description"], "")
+-        self.assertEqual(mod1["data"]["license"]["module"], [None])
++
++        # Between libmodulemd version 2.14.0 and 2.15.0 a change in `None`
++        # vs empty string happened
++        if min_libmodulemd_version("2.15.0"):
++            self.assertEqual(mod1["data"]["summary"], "")
++            self.assertEqual(mod1["data"]["license"]["module"], [""])
++        else:
++            self.assertEqual(mod1["data"]["summary"], None)
++            self.assertEqual(mod1["data"]["license"]["module"], [None])
+ 
+     def test_update_after_build(self):
+         """
+-- 
+2.41.0
+

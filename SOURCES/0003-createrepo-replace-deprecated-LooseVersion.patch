@@ -1,0 +1,133 @@
+From f3435b9a9f5ddff0d4593dbda7c5da592ea31f61 Mon Sep 17 00:00:00 2001
+From: Marek Kulik <mkulik@redhat.com>
+Date: Wed, 20 Apr 2022 09:38:51 +0200
+Subject: [PATCH 3/4] createrepo: replace deprecated LooseVersion
+
+DeprecationWarning: The distutils package is
+deprecated and slated for removal in Python 3.12
+---
+ .../createrepo_mod/createrepo_mod.py          | 13 +++++--
+ modulemd_tools/modulemd_tools/yaml.py         | 39 +++++++++++++++++++
+ modulemd_tools/tests/test_yaml.py             |  9 ++++-
+ 3 files changed, 55 insertions(+), 6 deletions(-)
+
+diff --git a/createrepo_mod/createrepo_mod/createrepo_mod.py b/createrepo_mod/createrepo_mod/createrepo_mod.py
+index ee078f7..4e0eb71 100755
+--- a/createrepo_mod/createrepo_mod/createrepo_mod.py
++++ b/createrepo_mod/createrepo_mod/createrepo_mod.py
+@@ -16,11 +16,16 @@ https://docs.fedoraproject.org/en-US/modularity/hosting-modules/
+ """
+ 
+ 
++import argparse
+ import os
+-import sys
+ import subprocess
+-import argparse
+-from distutils.version import LooseVersion
++import sys
++
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import LooseVersion as Version
+ 
+ import gi
+ gi.require_version("Modulemd", "2.0")
+@@ -99,7 +104,7 @@ def createrepo_c_with_builtin_module_support():
+     """
+     cmd = ["rpm", "-q", "createrepo_c", "--queryformat", "%{VERSION}"]
+     createrepo_c_version = subprocess.check_output(cmd).decode("utf-8")
+-    return LooseVersion(createrepo_c_version) >= LooseVersion("0.16.1")
++    return Version(createrepo_c_version) >= Version("0.16.1")
+ 
+ 
+ def main():
+diff --git a/modulemd_tools/modulemd_tools/yaml.py b/modulemd_tools/modulemd_tools/yaml.py
+index 43f314f..ac644b6 100644
+--- a/modulemd_tools/modulemd_tools/yaml.py
++++ b/modulemd_tools/modulemd_tools/yaml.py
+@@ -8,6 +8,12 @@ import os
+ import gi
+ import yaml
+ 
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import StrictVersion as Version
++
+ gi.require_version("Modulemd", "2.0")
+ from gi.repository import Modulemd  # noqa: E402
+ 
+@@ -307,3 +313,36 @@ def _stream2yaml(mod_stream):
+         return idx.dump_to_string()
+     except gi.repository.GLib.GError as ex:
+         raise RuntimeError(ex.message)
++
++
++def _modulemd_read_packager_string(mod_yaml, name=None, stream=None):
++    """
++    For the time being we happen to be in a transition state when
++    `Modulemd.ModuleStream.read_string` is deprecated and throws warnings on
++    Fedora but we still use old libmodulemd (2.9.4) on RHEL8, which doesn't
++    provide its replacement in the form of `Modulemd.read_packager_string`.
++    """
++    if Version(Modulemd.get_version()) < Version("2.11"):
++        mod_stream = Modulemd.ModuleStreamV2.new(name, stream)
++        mod_stream = mod_stream.read_string(mod_yaml, True, name, stream)
++        return mod_stream
++
++    return Modulemd.read_packager_string(mod_yaml, name, stream)
++
++
++def _modulestream_upgrade_ext(mod_stream, version):
++    """
++    For the time being we happen to be in a transition state when
++    `Modulemd.ModuleStream.upgrade` is deprecated and throws warnings on
++    Fedora but we still use old libmodulemd (2.9.4) on RHEL8, which doesn't
++    provide its replacement in the form of `Modulemd.ModuleStream.upgrade_ext`.
++    """
++    if Version(Modulemd.get_version()) < Version("2.10"):
++        return mod_stream.upgrade(version)
++
++    mod_upgraded = mod_stream.upgrade_ext(version)
++    return mod_upgraded.get_stream_by_NSVCA(
++        mod_stream.get_stream_name(),
++        mod_stream.get_version(),
++        mod_stream.get_context(),
++        mod_stream.get_arch())
+diff --git a/modulemd_tools/tests/test_yaml.py b/modulemd_tools/tests/test_yaml.py
+index 8090a2b..f51a330 100644
+--- a/modulemd_tools/tests/test_yaml.py
++++ b/modulemd_tools/tests/test_yaml.py
+@@ -2,10 +2,15 @@ import os
+ import unittest
+ from unittest import mock
+ import yaml
+-from distutils.version import LooseVersion
+ from modulemd_tools.yaml import (is_valid, validate, create, update, dump,
+                                  upgrade, _yaml2stream, _stream2yaml)
+ 
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import LooseVersion as Version
++
+ import gi
+ gi.require_version("Modulemd", "2.0")
+ from gi.repository import Modulemd  # noqa: E402
+@@ -19,7 +24,7 @@ def old_libmodulemd():
+     skip those few test on EPEL8 until it receives an update.
+     See also `080e2bb`
+     """
+-    return LooseVersion(Modulemd.get_version()) < LooseVersion("2.11.1")
++    return Version(Modulemd.get_version()) < Version("2.11.1")
+ 
+ 
+ class TestYaml(unittest.TestCase):
+-- 
+2.41.0
+
