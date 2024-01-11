@@ -1,13 +1,13 @@
 Name: modulemd-tools
 Version: 0.7
-Release: 6%{?dist}
+Release: 8%{?dist}
 Summary: Collection of tools for parsing and generating modulemd YAML files
 License: MIT
 BuildArch: noarch
 
 URL: https://github.com/rpm-software-management/modulemd-tools
 Source0: https://github.com/rpm-software-management/modulemd-tools/archive/%{version}/%{name}-%{version}.tar.gz
-Patch0: modulemd-tools-0.7-1-to-modulemd-tools-0.7-6.patch
+Patch0: modulemd-tools-0.7-1-to-modulemd-tools-0.7-8.patch
 
 BuildRequires: createrepo_c
 BuildRequires: python3-devel
@@ -158,6 +158,14 @@ cd ..
 
 
 %changelog
+* Tue Jul 18 2023 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-8
+- modulemd_tools: fix tests for new libmodulemd version 2.15.0
+  (frostyx@email.cz)
+- createrepo: replace deprecated LooseVersion (mkulik@redhat.com)
+
+* Thu Jun 29 2023 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-7
+- repo2module: don't traceback because of a modular SRPM in the repo
+
 * Fri Aug 27 2021 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-6
 - Do not install bld2repo as RHEL8 doesn't have python3-koji
   (jkadlcik@redhat.com)

@@ -16,17 +16,21 @@ index dc28167..e457b03 100644
  __pycache__/
 +.vscode/
 diff --git a/.tito/packages/modulemd-tools b/.tito/packages/modulemd-tools
-index ab403cf..9f9c5a0 100644
+index ab403cf..ebb3b3a 100644
 --- a/.tito/packages/modulemd-tools
 +++ b/.tito/packages/modulemd-tools
 @@ -1 +1 @@
 -0.7-1 ./
-+0.7-6 ./
++0.7-8 ./
 diff --git a/.tito/releasers.conf b/.tito/releasers.conf
-index 6ccadd0..62fd4b9 100644
+index 6ccadd0..dfcf64b 100644
 --- a/.tito/releasers.conf
 +++ b/.tito/releasers.conf
-@@ -1,7 +1,7 @@
+@@ -1,7 +1,11 @@
++[rhel]
++releaser = tito.release.DistGitReleaser
++branches = rhel-8.5.0
++
  [fedora]
  releaser = tito.release.FedoraGitReleaser
 -branches = master f32 f33 epel8
@@ -7504,9 +7508,41 @@ diff --git a/createrepo_mod/createrepo_mod/__init__.py b/createrepo_mod/createre
 new file mode 100644
 index 0000000..e69de29
 diff --git a/createrepo_mod/createrepo_mod.py b/createrepo_mod/createrepo_mod/createrepo_mod.py
-similarity index 100%
+similarity index 94%
 rename from createrepo_mod/createrepo_mod.py
 rename to createrepo_mod/createrepo_mod/createrepo_mod.py
+index ee078f7..4e0eb71 100755
+--- a/createrepo_mod/createrepo_mod.py
++++ b/createrepo_mod/createrepo_mod/createrepo_mod.py
+@@ -16,11 +16,16 @@ https://docs.fedoraproject.org/en-US/modularity/hosting-modules/
+ """
+ 
+ 
++import argparse
+ import os
+-import sys
+ import subprocess
+-import argparse
+-from distutils.version import LooseVersion
++import sys
++
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import LooseVersion as Version
+ 
+ import gi
+ gi.require_version("Modulemd", "2.0")
+@@ -99,7 +104,7 @@ def createrepo_c_with_builtin_module_support():
+     """
+     cmd = ["rpm", "-q", "createrepo_c", "--queryformat", "%{VERSION}"]
+     createrepo_c_version = subprocess.check_output(cmd).decode("utf-8")
+-    return LooseVersion(createrepo_c_version) >= LooseVersion("0.16.1")
++    return Version(createrepo_c_version) >= Version("0.16.1")
+ 
+ 
+ def main():
 diff --git a/createrepo_mod/requirements.txt b/createrepo_mod/requirements.txt
 new file mode 100644
 index 0000000..e69de29
@@ -8690,14 +8726,14 @@ index 0000000..f922b5e
 +    - bar-utils-2:3-4.fc33.noarch
 +...
 diff --git a/modulemd-tools.spec b/modulemd-tools.spec
-index 1bf1f59..d8b65f6 100644
+index 1bf1f59..97f8758 100644
 --- a/modulemd-tools.spec
 +++ b/modulemd-tools.spec
 @@ -1,6 +1,6 @@
  Name: modulemd-tools
  Version: 0.7
 -Release: 1%{?dist}
-+Release: 6%{?dist}
++Release: 8%{?dist}
  Summary: Collection of tools for parsing and generating modulemd YAML files
  License: MIT
  BuildArch: noarch
@@ -8804,7 +8840,7 @@ index 1bf1f59..d8b65f6 100644
  cd ..
  
  
-@@ -106,21 +135,77 @@ cd ..
+@@ -106,21 +135,85 @@ cd ..
  %{python3_sitelib}/repo2module-*.egg-info/
  %{python3_sitelib}/dir2module
  %{python3_sitelib}/dir2module-*.egg-info/
@@ -8830,6 +8866,14 @@ index 1bf1f59..d8b65f6 100644
  
  
  %changelog
++* Tue Jul 18 2023 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-8
++- modulemd_tools: fix tests for new libmodulemd version 2.15.0
++  (frostyx@email.cz)
++- createrepo: replace deprecated LooseVersion (mkulik@redhat.com)
++
++* Thu Jun 29 2023 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-7
++- repo2module: don't traceback because of a modular SRPM in the repo
++
 +* Fri Aug 27 2021 Jakub Kadlcik <jkadlcik@redhat.com> 0.7-6
 +- Do not install bld2repo as RHEL8 doesn't have python3-koji
 +  (jkadlcik@redhat.com)
@@ -8883,7 +8927,7 @@ index 1bf1f59..d8b65f6 100644
  * Tue Feb 09 2021 Jakub Kadlcik <frostyx@email.cz> 0.7-1
  - Generate manpages on the fly
  - Automated test builds incl. Docker/Travis
-@@ -129,7 +214,7 @@ cd ..
+@@ -129,7 +222,7 @@ cd ..
  - Drop libmodulemd dependency in favor of python3-libmodulemd
  
  * Sun Nov 22 2020 Jakub Kadlcik <frostyx@email.cz> 0.6-1
@@ -8893,18 +8937,23 @@ index 1bf1f59..d8b65f6 100644
  - modulemd_tools: add the first pieces of a python library (for internal usage only)
  
 diff --git a/modulemd_tools/modulemd_tools/yaml.py b/modulemd_tools/modulemd_tools/yaml.py
-index 43f314f..ec964f6 100644
+index 43f314f..c782bb0 100644
 --- a/modulemd_tools/modulemd_tools/yaml.py
 +++ b/modulemd_tools/modulemd_tools/yaml.py
-@@ -7,6 +7,7 @@ and all transformation functions are `str` -> `str`.
- import os
+@@ -8,6 +8,12 @@ import os
  import gi
  import yaml
-+from distutils.version import StrictVersion
  
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import StrictVersion as Version
++
  gi.require_version("Modulemd", "2.0")
  from gi.repository import Modulemd  # noqa: E402
-@@ -104,14 +105,9 @@ def update(mod_yaml, name=None, stream=None, version=None, context=None,
+ 
+@@ -104,14 +110,9 @@ def update(mod_yaml, name=None, stream=None, version=None, context=None,
  
      """
      mod_stream = _yaml2stream(mod_yaml)
@@ -8920,7 +8969,7 @@ index 43f314f..ec964f6 100644
  
      if version:
          mod_stream.set_version(version)
-@@ -235,12 +231,12 @@ def upgrade(mod_yaml, version):
+@@ -235,12 +236,12 @@ def upgrade(mod_yaml, version):
      if parsed["version"] > version:
          raise ValueError("Cannot downgrade modulemd version")
  
@@ -8936,7 +8985,7 @@ index 43f314f..ec964f6 100644
      return _stream2yaml(mod_stream_upgraded)
  
  
-@@ -295,7 +291,7 @@ def _generate_filename(mod_yaml):
+@@ -295,7 +296,7 @@ def _generate_filename(mod_yaml):
  
  def _yaml2stream(mod_yaml):
      try:
@@ -8945,7 +8994,7 @@ index 43f314f..ec964f6 100644
      except gi.repository.GLib.GError as ex:
          raise ValueError(ex.message)
  
-@@ -307,3 +303,36 @@ def _stream2yaml(mod_stream):
+@@ -307,3 +308,36 @@ def _stream2yaml(mod_stream):
          return idx.dump_to_string()
      except gi.repository.GLib.GError as ex:
          raise RuntimeError(ex.message)
@@ -8958,7 +9007,7 @@ index 43f314f..ec964f6 100644
 +    Fedora but we still use old libmodulemd (2.9.4) on RHEL8, which doesn't
 +    provide its replacement in the form of `Modulemd.read_packager_string`.
 +    """
-+    if StrictVersion(Modulemd.get_version()) < StrictVersion("2.11"):
++    if Version(Modulemd.get_version()) < Version("2.11"):
 +        mod_stream = Modulemd.ModuleStreamV2.new(name, stream)
 +        mod_stream = mod_stream.read_string(mod_yaml, True, name, stream)
 +        return mod_stream
@@ -8973,7 +9022,7 @@ index 43f314f..ec964f6 100644
 +    Fedora but we still use old libmodulemd (2.9.4) on RHEL8, which doesn't
 +    provide its replacement in the form of `Modulemd.ModuleStream.upgrade_ext`.
 +    """
-+    if StrictVersion(Modulemd.get_version()) < StrictVersion("2.10"):
++    if Version(Modulemd.get_version()) < Version("2.10"):
 +        return mod_stream.upgrade(version)
 +
 +    mod_upgraded = mod_stream.upgrade_ext(version)
@@ -9022,10 +9071,10 @@ index 0000000..ac179b4
 +    include_package_data=True,
 +)
 diff --git a/modulemd_tools/tests/test_yaml.py b/modulemd_tools/tests/test_yaml.py
-index e33e390..8090a2b 100644
+index e33e390..02774b3 100644
 --- a/modulemd_tools/tests/test_yaml.py
 +++ b/modulemd_tools/tests/test_yaml.py
-@@ -1,7 +1,6 @@
+@@ -1,12 +1,17 @@
  import os
  import unittest
  from unittest import mock
@@ -9033,7 +9082,50 @@ index e33e390..8090a2b 100644
  import yaml
  from distutils.version import LooseVersion
  from modulemd_tools.yaml import (is_valid, validate, create, update, dump,
-@@ -327,11 +326,11 @@ class TestYaml(unittest.TestCase):
+                                  upgrade, _yaml2stream, _stream2yaml)
+ 
++# python3-packaging in not available in RHEL 8.x
++try:
++    from packaging.version import Version
++except ModuleNotFoundError:
++    from distutils.version import LooseVersion as Version
++
+ import gi
+ gi.require_version("Modulemd", "2.0")
+ from gi.repository import Modulemd  # noqa: E402
+@@ -20,7 +25,11 @@ def old_libmodulemd():
+     skip those few test on EPEL8 until it receives an update.
+     See also `080e2bb`
+     """
+-    return LooseVersion(Modulemd.get_version()) < LooseVersion("2.11.1")
++    return Version(Modulemd.get_version()) < Version("2.11.1")
++
++
++def min_libmodulemd_version(version):
++    return Version(Modulemd.get_version()) >= Version(version)
+ 
+ 
+ class TestYaml(unittest.TestCase):
+@@ -53,9 +62,16 @@ class TestYaml(unittest.TestCase):
+         self.assertEqual(mod1["version"], 2)
+         self.assertEqual(mod1["data"]["name"], "foo")
+         self.assertEqual(mod1["data"]["stream"], "stable")
+-        self.assertEqual(mod1["data"]["summary"], None)
+         self.assertEqual(mod1["data"]["description"], "")
+-        self.assertEqual(mod1["data"]["license"]["module"], [None])
++
++        # Between libmodulemd version 2.14.0 and 2.15.0 a change in `None`
++        # vs empty string happened
++        if min_libmodulemd_version("2.15.0"):
++            self.assertEqual(mod1["data"]["summary"], "")
++            self.assertEqual(mod1["data"]["license"]["module"], [""])
++        else:
++            self.assertEqual(mod1["data"]["summary"], None)
++            self.assertEqual(mod1["data"]["license"]["module"], [None])
+ 
+     def test_update_after_build(self):
+         """
+@@ -327,11 +343,11 @@ class TestYaml(unittest.TestCase):
          self.assertIn("Cannot downgrade modulemd version",
                        str(context.exception))
  
@@ -9051,7 +9143,7 @@ index e33e390..8090a2b 100644
      def test_upgrade_unexpected_version(self):
          # Neither current modulemd version cannot be unexpected
 diff --git a/repo2module/repo2module/cli.py b/repo2module/repo2module/cli.py
-index c91e08f..1d4ce27 100644
+index c91e08f..44dd24c 100644
 --- a/repo2module/repo2module/cli.py
 +++ b/repo2module/repo2module/cli.py
 @@ -1,6 +1,6 @@
@@ -9062,7 +9154,19 @@ index c91e08f..1d4ce27 100644
  import createrepo_c as cr
  import gi
  import logging
-@@ -71,48 +71,49 @@ def get_source_packages(packages):
+@@ -61,6 +61,11 @@ def get_source_packages(packages):
+     """
+     source_packages = set()
+     for pkg in packages:
++        # In this case, the `pkg` is a SRPM file
++        if not pkg.rpm_sourcerpm:
++            source_packages.add(pkg.name)
++            continue
++
+         # Get the source RPM NEVRA without the trailing ".rpm"
+         subject = Subject(pkg.rpm_sourcerpm[:-4])
+ 
+@@ -71,48 +76,49 @@ def get_source_packages(packages):
  
      return source_packages
  
@@ -9148,7 +9252,7 @@ index c91e08f..1d4ce27 100644
      stream.set_summary('<auto-generated module summary>')
      stream.set_description('<auto-generated module description>')
      stream.add_module_license("MIT")
-@@ -135,15 +136,15 @@ def cli(debug,
+@@ -135,15 +141,15 @@ def cli(debug,
      stream.add_profile(common_profile)
  
      # Add defaults for this module
