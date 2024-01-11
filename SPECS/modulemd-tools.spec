@@ -1,12 +1,24 @@
 Name: modulemd-tools
 Version: 0.9
-Release: 3%{?dist}
+Release: 5%{?dist}
 Summary: Collection of tools for parsing and generating modulemd YAML files
 License: MIT
 BuildArch: noarch
 
 URL: https://github.com/rpm-software-management/modulemd-tools
 Source0: https://github.com/rpm-software-management/modulemd-tools/archive/%{version}/%{name}-%{version}.tar.gz
+
+# https://github.com/rpm-software-management/modulemd-tools/commit/195df77
+Patch0: 0001-dir2module-generate-also-profiles-and-modulemd-defau.patch
+
+# https://github.com/rpm-software-management/modulemd-tools/commit/0d718ca
+Patch1: 0002-repo2module-don-t-traceback-because-of-a-modular-SRP.patch
+
+# https://github.com/rpm-software-management/modulemd-tools/commit/cd04198
+Patch2: 0003-createrepo-replace-deprecated-LooseVersion.patch
+
+# https://github.com/rpm-software-management/modulemd-tools/commit/ac3b173
+Patch3: 0004-modulemd_tools-fix-tests-for-new-libmodulemd-version.patch
 
 BuildRequires: createrepo_c
 BuildRequires: argparse-manpage
@@ -50,7 +62,7 @@ modulemd-generate-macros - Generate module-build-macros SRPM package, which is
 
 
 %prep
-%setup -q
+%autosetup -p1
 
 
 %build
@@ -156,6 +168,17 @@ cd ..
 
 
 %changelog
+* Sun Jul 30 2023 Jakub Kadlcik <jkadlcik@redhat.com> - 0.9-5
+- Don't traceback because of a modular SRPM in the repo
+  Related: rhbz#2227436
+- Replace deprecated LooseVersion
+- Fix tests for new libmodulemd version 2.15.0
+
+* Fri Jul 21 2023 Jakub Kadlcik <jkadlcik@redhat.com> - 0.9-4
+- Generate profiles section and modulemd-defaults file
+  Related: rhbz#1801747
+- Use autosetup to automatically apply patches
+
 * Mon Aug 09 2021 Mohan Boddu <mboddu@redhat.com> - 0.9-3
 - Rebuilt for IMA sigs, glibc 2.34, aarch64 flags
   Related: rhbz#1991688
@@ -181,7 +204,7 @@ cd ..
 - Drop libmodulemd dependency in favor of python3-libmodulemd
 
 * Sun Nov 22 2020 Jakub Kadlcik <frostyx@email.cz> 0.6-1
-- Generate manpages for all tools in this repository 
+- Generate manpages for all tools in this repository
 - modulemd-generate-macros: add a tool for generating module-build-macros
 - modulemd_tools: add the first pieces of a python library (for internal usage only)
 

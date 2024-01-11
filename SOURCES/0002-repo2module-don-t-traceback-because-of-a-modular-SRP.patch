@@ -1,0 +1,30 @@
+From 1188c8215955c14fadb1f17c2b55f4135db2a224 Mon Sep 17 00:00:00 2001
+From: Jakub Kadlcik <frostyx@email.cz>
+Date: Tue, 2 May 2023 00:12:39 +0200
+Subject: [PATCH 2/4] repo2module: don't traceback because of a modular SRPM in
+ the repo
+
+Fix RHBZ 2186223
+---
+ repo2module/repo2module/cli.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/repo2module/repo2module/cli.py b/repo2module/repo2module/cli.py
+index 1d4ce27..44dd24c 100644
+--- a/repo2module/repo2module/cli.py
++++ b/repo2module/repo2module/cli.py
+@@ -61,6 +61,11 @@ def get_source_packages(packages):
+     """
+     source_packages = set()
+     for pkg in packages:
++        # In this case, the `pkg` is a SRPM file
++        if not pkg.rpm_sourcerpm:
++            source_packages.add(pkg.name)
++            continue
++
+         # Get the source RPM NEVRA without the trailing ".rpm"
+         subject = Subject(pkg.rpm_sourcerpm[:-4])
+ 
+-- 
+2.41.0
+
